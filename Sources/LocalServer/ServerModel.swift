@@ -45,12 +45,15 @@ final class ServerModel: ObservableObject {
     @Published private(set) var tunnelStatus: TunnelStatus = .stopped
     @Published private(set) var tunnelError: String?
     @Published private(set) var isLoggingIn = false
+    /// The Authorize page cloudflared opened, to open again if the browser tab got lost.
+    @Published private(set) var loginURL: URL?
     @Published private(set) var isCloudflareLoggedIn = CloudflareTunnel.isLoggedIn
     let hasCloudflared = CloudflareTunnel.executable() != nil
 
     private let defaults = UserDefaults.standard
     private var server: HTTPServer?
     private var tunnel: CloudflareTunnel?
+    private var loginProcess: Process?
     private static let timeFormat: DateFormatter = {
         let format = DateFormatter()
         format.dateFormat = "HH:mm:ss"
@@ -82,7 +85,10 @@ final class ServerModel: ObservableObject {
         refresh()
         // Do not leave cloudflared running after the app quits.
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tunnel?.stop() }
+            MainActor.assumeIsolated {
+                self?.tunnel?.stop()
+                self?.loginProcess?.terminate()
+            }
         }
     }
 
@@ -196,18 +202,32 @@ final class ServerModel: ObservableObject {
     func loginCloudflare() {
         guard !isLoggingIn else { return }
         isLoggingIn = true
+        loginURL = nil
         tunnelError = nil
-        appendLine("tunnel: cloudflared tunnel login (finish in the browser)")
-        CloudflareTunnel.login(onLog: { [weak self] line in
+        appendLine("tunnel: cloudflared tunnel login — in the browser pick the domain's zone, then click Authorize")
+        loginProcess = CloudflareTunnel.login(onLog: { [weak self] line in
             Task { @MainActor in self?.appendLine("tunnel: \(line)") }
+        }, onURL: { [weak self] url in
+            Task { @MainActor in self?.loginURL = url }
         }, completion: { [weak self] failure in
             Task { @MainActor in
                 guard let self else { return }
+                self.loginProcess = nil
                 self.isLoggingIn = false
+                self.loginURL = nil
                 self.tunnelError = failure
                 self.isCloudflareLoggedIn = CloudflareTunnel.isLoggedIn
+                self.appendLine(self.isCloudflareLoggedIn ? "tunnel: logged in, ~/.cloudflared/cert.pem saved" : "tunnel: login not finished")
             }
         })
+    }
+
+    func cancelLogin() {
+        loginProcess?.terminate()
+    }
+
+    func openLoginPage() {
+        if let loginURL { NSWorkspace.shared.open(loginURL) }
     }
 
     private func handle(_ event: CloudflareTunnel.Event) {

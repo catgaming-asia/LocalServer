@@ -54,13 +54,47 @@ final class CloudflareTunnel {
     static var configFolder: URL { FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cloudflared") }
     static var isLoggedIn: Bool { FileManager.default.fileExists(atPath: configFolder.appendingPathComponent("cert.pem").path) }
 
-    /// `cloudflared tunnel login`: opens the browser to pick a zone, writes ~/.cloudflared/cert.pem.
-    static func login(onLog: @escaping (String) -> Void, completion: @escaping (String?) -> Void) {
-        DispatchQueue.global().async {
-            guard let exe = executable() else { return completion(Failure.missing.errorDescription) }
-            let result = run(exe, ["tunnel", "login"], onLine: onLog)
-            completion(result.status == 0 && isLoggedIn ? nil : lastLine(result.output) ?? "cloudflared tunnel login failed")
+    /// `cloudflared tunnel login`: opens the browser; signing in is not enough, the user must pick the domain's zone and
+    /// click Authorize, then cloudflared writes ~/.cloudflared/cert.pem and exits. Returns the process so it can be cancelled.
+    @discardableResult
+    static func login(onLog: @escaping (String) -> Void, onURL: @escaping (URL) -> Void,
+                      completion: @escaping (String?) -> Void) -> Process? {
+        guard let exe = executable() else {
+            completion(Failure.missing.errorDescription)
+            return nil
         }
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = exe
+        process.arguments = ["tunnel", "login"]
+        process.standardOutput = pipe
+        process.standardError = pipe
+        let lastLine = LastLine()
+        pipe.fileHandleForReading.readabilityHandler = { handle in
+            for line in String(decoding: handle.availableData, as: UTF8.self).split(separator: "\n").map(String.init) {
+                onLog(line)
+                lastLine.value = line
+                if let range = line.range(of: #"https://dash\.cloudflare\.com/argotunnel\S*"#, options: .regularExpression),
+                   let url = URL(string: String(line[range])) { onURL(url) }
+            }
+        }
+        process.terminationHandler = { process in
+            pipe.fileHandleForReading.readabilityHandler = nil
+            if isLoggedIn { return completion(nil) }
+            // SIGTERM = Cancel.
+            completion(process.terminationReason == .uncaughtSignal ? nil : lastLine.value ?? "cloudflared tunnel login failed")
+        }
+        do {
+            try process.run()
+        } catch {
+            completion(error.localizedDescription)
+            return nil
+        }
+        return process
+    }
+
+    private final class LastLine: @unchecked Sendable {
+        var value: String?
     }
 
     // MARK: - Run

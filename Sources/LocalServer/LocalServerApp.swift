@@ -194,8 +194,18 @@ struct ContentView: View {
                             Text("Not logged in").foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button(model.isLoggingIn ? "Waiting for browser…" : "Login…") { model.loginCloudflare() }
-                            .disabled(model.isLoggingIn || model.isCloudflareLoggedIn || !model.hasCloudflared)
+                        if model.isLoggingIn {
+                            ProgressView().controlSize(.small)
+                            Button("Open Page") { model.openLoginPage() }.disabled(model.loginURL == nil)
+                            Button("Cancel") { model.cancelLogin() }
+                        } else {
+                            Button("Login…") { model.loginCloudflare() }
+                                .disabled(model.isCloudflareLoggedIn || !model.hasCloudflared)
+                        }
+                    }
+                    if model.isLoggingIn {
+                        Text("Signing in is not enough: on the “Authorize Cloudflare Tunnel” page pick the zone of your domain (e.g. example.com for cdn.example.com) and click Authorize. No zone listed = the domain is not on this Cloudflare account.")
+                            .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 if let url = model.tunnelStatus.url {

@@ -76,7 +76,9 @@ brew install cloudflared
 - **Quick**: bấm **Start Tunnel** → URL ngẫu nhiên `https://<từ-ngẫu-nhiên>.trycloudflare.com`, không cần tài khoản. URL đổi mỗi lần start nên phải sửa URL config và build lại mỗi lần.
 - **Custom domain**: URL cố định `https://<domain>`. Domain phải là zone trong tài khoản Cloudflare.
   1. Nhập **Domain** (vd. `cdn.example.com`) và **Tunnel** (tên tunnel, mặc định `deuegambit-localserver`).
-  2. **Login…** một lần trên máy này: trình duyệt mở ra, chọn zone của domain → lưu `~/.cloudflared/cert.pem`.
+  2. **Login…** một lần trên máy này. Đăng nhập Cloudflare **chưa đủ**: ở trang **Authorize Cloudflare Tunnel** phải chọn zone của domain
+     (vd. `example.com` cho `cdn.example.com`) rồi bấm **Authorize**, khi đó mới có `~/.cloudflared/cert.pem` và app chuyển sang *Logged in*.
+     Lỡ đóng tab: **Open Page**; muốn làm lại: **Cancel** rồi **Login…**. Không thấy zone nào = domain chưa nằm trong tài khoản Cloudflare đó.
   3. **Start Tunnel**: app tự `cloudflared tunnel create` (nếu chưa có), `tunnel route dns --overwrite-dns` (tạo/ghi đè CNAME của domain) rồi `tunnel run`.
 
 Khi tunnel chạy, URL trong danh sách CLR / Addressables và mã QR chuyển sang URL https. Trong Unity dùng:
