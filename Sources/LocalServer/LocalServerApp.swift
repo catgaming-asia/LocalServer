@@ -203,6 +203,16 @@ struct ContentView: View {
                                 .disabled(model.isCloudflareLoggedIn || !model.hasCloudflared)
                         }
                     }
+                    if model.isLoggingIn, let url = model.loginURL {
+                        HStack {
+                            Text("Login link").frame(width: 80, alignment: .leading)
+                            Text(url.absoluteString).font(.caption.monospaced())
+                                .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+                                .help(url.absoluteString)
+                            Spacer()
+                            Button("Copy") { model.copy(url.absoluteString) }
+                        }
+                    }
                     if model.isLoggingIn {
                         Text("Signing in is not enough: on the “Authorize Cloudflare Tunnel” page pick the zone of your domain (e.g. example.com for cdn.example.com) and click Authorize. No zone listed = the domain is not on this Cloudflare account.")
                             .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
