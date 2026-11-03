@@ -34,14 +34,18 @@ enum Headless {
             }
             fflush(stdout)
         }
-        // Ctrl-C: take cloudflared down with us.
-        signal(SIGINT, SIG_IGN)
-        let interrupt = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
-        interrupt.setEventHandler {
-            tunnel.stop()
-            exit(0)
+        // Ctrl-C, kill, closing the Terminal window: take cloudflared down with us.
+        let signals = [SIGINT, SIGTERM, SIGHUP].map { number in
+            signal(number, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
+            source.setEventHandler {
+                tunnel.stop()
+                exit(0)
+            }
+            source.resume()
+            return source
         }
-        interrupt.resume()
+        _ = signals
 
         let server = HTTPServer(router: Router(clrRoot: clrRoot, addressablesRoot: addressablesRoot), onLog: { entry in
             print("\(format.string(from: Date())) \(entry.method) \(entry.path) \(entry.status) \(entry.bytes)")

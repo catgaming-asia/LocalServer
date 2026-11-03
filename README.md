@@ -84,12 +84,58 @@ Khi tunnel chạy, URL trong danh sách CLR / Addressables và mã QR chuyển s
 
 Ai có URL cũng tải được file, nên tắt tunnel khi không test. Stop server hoặc thoát app cũng tắt tunnel.
 
-## Chạy không giao diện
+## Chạy không giao diện (CLI)
+
+Chạy trong Terminal (app Terminal của macOS hoặc tab Terminal của IDE) và để cửa sổ mở; **Ctrl-C** để dừng server và tunnel.
+Không chạy bằng `!` trong ô chat của Claude Code: lệnh bị dừng ngay khi trả kết quả.
+`--project` là đường dẫn tuyệt đối tới project Unity (repo này không nằm trong project).
+
+Chỉ LAN:
 
 ```bash
-build/LocalServer.app/Contents/MacOS/LocalServer --serve --project .. --port 8080 \
-    [--clr-dir <path>] [--addressables-dir <path>] [--tunnel quick|<domain>] [--tunnel-name <name>]
+build/LocalServer.app/Contents/MacOS/LocalServer --serve --project /Volumes/PM981/workspace/deuegambit --port 8080
 ```
+
+LAN + tunnel HTTPS ngẫu nhiên (`https://….trycloudflare.com`, in ra ở dòng `Tunnel up:`):
+
+```bash
+build/LocalServer.app/Contents/MacOS/LocalServer --serve --project /Volumes/PM981/workspace/deuegambit --port 8080 --tunnel quick
+```
+
+LAN + domain cố định (đã `cloudflared tunnel login` hoặc **Login…** trong app một lần):
+
+```bash
+build/LocalServer.app/Contents/MacOS/LocalServer --serve --project /Volumes/PM981/workspace/deuegambit --port 8080 --tunnel cdn.example.com --tunnel-name deuegambit-localserver
+```
+
+Tuỳ chọn thêm khi không dùng thư mục mặc định: `--clr-dir /đường/dẫn/CLR` và `--addressables-dir /đường/dẫn/ServerData`.
+Khi xuống dòng bằng `\`, sau `\` không được có dấu cách. Đừng dán nguyên `[...]` hay `<...>` vào zsh: đó là ký hiệu tuỳ chọn, zsh báo `bad pattern`.
+
+### Lỗi `Address already in use` (port bị chiếm)
+
+`Listener failed: … error 48 - Address already in use` nghĩa là đã có thứ khác nghe trên port đó, thường là chính Local Server:
+một lần chạy CLI trước còn sống (tab Terminal khác, hoặc bấm Ctrl-Z thay vì Ctrl-C) hoặc app giao diện đang **Start** cùng port.
+
+Xem ai đang giữ port 8080:
+
+```bash
+lsof -nP -iTCP:8080 -sTCP:LISTEN
+```
+
+Tắt mọi Local Server chạy CLI và tunnel của nó:
+
+```bash
+pkill -f "LocalServer --serve"; pkill -f "cloudflared tunnel --no-autoupdate"
+```
+
+Hoặc tắt đúng tiến trình đang giữ port 8080:
+
+```bash
+kill $(lsof -tiTCP:8080 -sTCP:LISTEN)
+```
+
+Nếu là app giao diện thì bấm **Stop** (hoặc Quit). Không muốn tắt thì chạy CLI ở port khác, ví dụ `--port 8081`.
+`kill` hay đóng cửa sổ Terminal đều tắt luôn `cloudflared`; còn sót thì lệnh `pkill` ở trên dọn nốt.
 
 ## Ghi chú
 
